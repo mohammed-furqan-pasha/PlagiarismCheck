@@ -1,0 +1,23 @@
+# Core Backend Framework
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+
+# AI / NLP / Plagiarism Detection Libraries
+# Sentence-Transformers for Semantic Matching (SBERT)
+sentence-transformers
+# FAISS for efficient similarity search (Semantic Search Index)
+faiss-cpu
+# Datasketch for MinHash and Locality Sensitive Hashing (LSH)
+datasketch
+# Tokenization and standard NLP utilities
+nltk
+
+# Database/Storage (Assuming a simple setup for the corpus)
+# Though you mentioned Supabase, we'll keep the core package light. 
+# We might add 'supabase-py' later if needed for the ORM, but 
+# for a prototype, we'll focus on the core detection first.
+
+# Optional (for development/debugging)
+ipython
