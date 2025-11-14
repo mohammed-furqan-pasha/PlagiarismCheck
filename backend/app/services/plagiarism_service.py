@@ -5,11 +5,7 @@ from sentence_transformers import SentenceTransformer
 from datasketch import MinHashLSH, MinHash
 import faiss
 
-# --- Configuration Constants ---
-# NOTE: These can be moved to a separate config file later
-MODEL_NAME = 'all-MiniLM-L6-v2'  # Excellent balance of speed and accuracy
-LSH_PERMUTATIONS = 128           # Recommended number of permutations for MinHash
-LSH_THRESHOLD = 0.5              # Jaccard similarity threshold for MinHash matches
+from ..core.config import settings
 
 class PlagiarismService:
     """
