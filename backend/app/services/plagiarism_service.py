@@ -5,7 +5,10 @@ from sentence_transformers import SentenceTransformer
 from datasketch import MinHashLSH, MinHash
 import faiss
 
+# --- IMPORT CONFIGURATION ---
 from ..core.config import settings
+from ..models.plagiarism import MatchResult 
+# NOTE: Removed hardcoded constants as they are now in settings
 
 class PlagiarismService:
     """
@@ -23,26 +26,29 @@ class PlagiarismService:
         self.corpus_documents = self._load_corpus(corpus_path)
 
         # 2. Semantic Model (SBERT)
-        print(f"Loading SBERT model: {MODEL_NAME}...")
-        self.sbert_model = SentenceTransformer(MODEL_NAME)
+        # --- USAGE UPDATE 1: Use settings.SBERT_MODEL_NAME ---
+        print(f"Loading SBERT model: {settings.SBERT_MODEL_NAME}...")
+        self.sbert_model = SentenceTransformer(settings.SBERT_MODEL_NAME)
         self.corpus_embeddings = self._generate_embeddings(self.corpus_documents)
 
         # 3. Semantic Index (FAISS)
         self.faiss_index = self._build_faiss_index(self.corpus_embeddings)
 
         # 4. Lexical Index (MinHash/LSH)
-        self.lsh_index = MinHashLSH(threshold=LSH_THRESHOLD, num_permutations=LSH_PERMUTATIONS)
+        # --- USAGE UPDATE 2 & 3: Use settings.LSH_THRESHOLD and settings.LSH_PERMUTATIONS ---
+        self.lsh_index = MinHashLSH(
+            threshold=settings.LSH_THRESHOLD, 
+            num_permutations=settings.LSH_PERMUTATIONS
+        )
         self.corpus_minhashes = self._build_lsh_index(self.corpus_documents)
 
         print("Plagiarism Service initialization complete.")
 
     def _load_corpus(self, path: str) -> List[str]:
         """Loads and splits the corpus text into manageable 'documents' (sentences/paragraphs)."""
-        # For a prototype, we'll split by double newline (paragraph break)
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            # Simple split by paragraph or sentence
             documents = [doc.strip() for doc in content.split('\n\n') if doc.strip()]
             print(f"Loaded corpus with {len(documents)} documents.")
             return documents
@@ -52,13 +58,12 @@ class PlagiarismService:
 
     def _generate_embeddings(self, documents: List[str]) -> np.ndarray:
         """Generates SBERT embeddings for the corpus documents."""
-        # Note: Setting convert_to_tensor=False ensures a numpy array output
         return self.sbert_model.encode(documents, convert_to_tensor=False)
 
     def _build_faiss_index(self, embeddings: np.ndarray) -> faiss.Index:
         """Builds a FAISS Index for fast semantic similarity search."""
         dimension = embeddings.shape[1]
-        index = faiss.IndexFlatL2(dimension)  # Simple L2 (Euclidean distance) index
+        index = faiss.IndexFlatL2(dimension)
         index.add(embeddings)
         print(f"FAISS index built with {index.ntotal} vectors of dimension {dimension}.")
         return index
@@ -66,9 +71,11 @@ class PlagiarismService:
     def _build_lsh_index(self, documents: List[str]) -> Dict[str, MinHash]:
         """Generates MinHashes and populates the LSH index."""
         minhashes = {}
+        # --- USAGE UPDATE 4: Use settings.LSH_PERMUTATIONS ---
+        num_perms = settings.LSH_PERMUTATIONS
+        
         for i, doc in enumerate(documents):
-            m = MinHash(num_permutations=LSH_PERMUTATIONS)
-            # Simple word-based hashing; can be improved with n-grams
+            m = MinHash(num_permutations=num_perms)
             for d in doc.lower().split():
                 m.update(d.encode('utf8'))
             key = f"doc_{i}"
@@ -77,34 +84,54 @@ class PlagiarismService:
         print(f"LSH index built with {len(minhashes)} MinHashes.")
         return minhashes
 
-    def check_plagiarism(self, input_text: str, k_semantic: int = 5, k_lexical: int = 5) -> dict:
+    def check_plagiarism(self, input_text: str) -> dict:
         """
         The main method for checking the input text against the corpus.
+        
+        Note: The k values are now pulled from the settings.
         """
         if not self.corpus_documents:
             return {"error": "Corpus not loaded."}
 
-        # 1. Prepare Input
         start_time = time.time()
+        # Simple sentence tokenization
         input_sentences = [sent.strip() for sent in input_text.split('.') if sent.strip()]
         if not input_sentences:
             return {"error": "Input text is too short or invalid."}
 
-        # 2. Semantic Check (SBERT + FAISS)
-        semantic_results = self._semantic_search(input_sentences, k=k_semantic)
+        # 1. Semantic Check (SBERT + FAISS)
+        semantic_results = self._semantic_search(
+            input_sentences, 
+            k=settings.K_SEMANTIC_NEIGHBORS
+        )
 
-        # 3. Lexical Check (MinHash + LSH)
-        lexical_results = self._lexical_search(input_sentences, k=k_lexical)
+        # 2. Lexical Check (MinHash + LSH)
+        lexical_results = self._lexical_search(
+            input_sentences, 
+            k=settings.K_LEXICAL_NEIGHBORS
+        )
         
-        # 4. Combine and Score (Placeholder logic)
-        combined_score = self._calculate_overall_score(semantic_results, lexical_results)
+        # 3. Combine and Score
+        combined_score, lexical_breakdown, semantic_breakdown = self._calculate_overall_score(
+            semantic_results, lexical_results
+        )
 
         end_time = time.time()
+        
+        # Combine results into a single list of matches for the API response
+        all_matches = sorted(
+            semantic_results + lexical_results, 
+            key=lambda x: x['similarity_score'], 
+            reverse=True
+        )
 
         return {
             "overall_similarity": combined_score,
+            "lexical_breakdown": lexical_breakdown,
+            "semantic_breakdown": semantic_breakdown,
             "lexical_matches": lexical_results,
             "semantic_matches": semantic_results,
+            "matches": [MatchResult(**m).model_dump() for m in all_matches],
             "processing_time_s": round(end_time - start_time, 3)
         }
 
@@ -113,79 +140,90 @@ class PlagiarismService:
     def _semantic_search(self, input_sentences: List[str], k: int) -> List[Dict]:
         """Performs semantic search using SBERT embeddings and FAISS."""
         results = []
-        input_embeddings = self._generate_embeddings(input_sentences)
+        if not input_sentences: return results
         
-        # Search the index: D = distances, I = indices of nearest neighbors
-        # k is the number of nearest neighbors to retrieve for *each* input sentence
+        input_embeddings = self._generate_embeddings(input_sentences)
         D, I = self.faiss_index.search(input_embeddings, k) 
 
         for i, (query_sentence, indices, distances) in enumerate(zip(input_sentences, I, D)):
             for index, distance in zip(indices, distances):
-                # distance is L2, convert to similarity score (higher is better, rough estimation)
-                # A simple, non-linear conversion: 1 / (1 + distance)
-                similarity = round(1 / (1 + distance), 4)
+                # Cosine similarity is generally 1 / (1 + distance) for L2 in unit space, 
+                # but we use a simpler formula for a score: 1 - normalized_distance
+                # A cosine similarity transformation: 1 - (distance / 2) is often used, but here we keep it simple.
+                similarity = round(1 / (1 + distance) * 100, 2) # Score 0-100%
 
                 results.append({
                     "query_text": query_sentence,
                     "matched_text": self.corpus_documents[index],
                     "similarity_score": similarity,
-                    "match_type": "semantic"
+                    "match_type": "semantic",
+                    "source_id": f"corpus_doc_{index}"
                 })
 
-        # Sort by similarity and return top matches overall
+        # Return only the top 'k' semantic results overall
         results.sort(key=lambda x: x['similarity_score'], reverse=True)
         return results[:k]
+
 
     def _lexical_search(self, input_sentences: List[str], k: int) -> List[Dict]:
         """Performs lexical search using MinHash and LSH."""
         results = []
+        num_perms = settings.LSH_PERMUTATIONS
         
         for query_sentence in input_sentences:
-            m_query = MinHash(num_permutations=LSH_PERMUTATIONS)
-            # Hash the query sentence
+            m_query = MinHash(num_permutations=num_perms)
             for d in query_sentence.lower().split():
                 m_query.update(d.encode('utf8'))
             
-            # Query the LSH index for potential candidates
             candidates = self.lsh_index.query(m_query)
             
             for doc_key in candidates:
-                # Calculate Jaccard similarity between query and candidate MinHashes
                 m_candidate = self.corpus_minhashes[doc_key]
                 jaccard_similarity = m_query.jaccard(m_candidate)
                 
-                # Retrieve the full text of the matched document
-                doc_index = int(doc_key.split('_')[1])
-                
-                results.append({
-                    "query_text": query_sentence,
-                    "matched_text": self.corpus_documents[doc_index],
-                    "similarity_score": round(jaccard_similarity * 100, 2),
-                    "match_type": "lexical"
-                })
+                # We only consider matches that meet the MinHash LSH threshold for accuracy
+                if jaccard_similarity >= settings.LSH_THRESHOLD:
+                    doc_index = int(doc_key.split('_')[1])
+                    
+                    results.append({
+                        "query_text": query_sentence,
+                        "matched_text": self.corpus_documents[doc_index],
+                        "similarity_score": round(jaccard_similarity * 100, 2),
+                        "match_type": "lexical",
+                        "source_id": doc_key
+                    })
 
-        # Sort by similarity and return top matches overall
+        # Return only the top 'k' lexical results overall
         results.sort(key=lambda x: x['similarity_score'], reverse=True)
         return results[:k]
 
-    def _calculate_overall_score(self, semantic_results: List[Dict], lexical_results: List[Dict]) -> float:
-        """
-        Placeholder function to calculate a final, combined score (0-100%).
-        This is where the magic (or weighted average) happens.
-        """
-        # Simple Example: Average the top 3 similarities from both methods
-        
-        # Get top similarities (normalized 0 to 1)
-        lexical_scores = [r['similarity_score'] / 100.0 for r in lexical_results[:3]]
-        semantic_scores = [r['similarity_score'] for r in semantic_results[:3]]
 
-        all_scores = lexical_scores + semantic_scores
+    def _calculate_overall_score(self, semantic_results: List[Dict], lexical_results: List[Dict]) -> Tuple[float, float, float]:
+        """
+        Calculates a final, combined score (0-100%) using weights from settings.
+        """
+        W_LEX = settings.WEIGHT_LEXICAL
+        W_SEM = settings.WEIGHT_SEMANTIC
         
-        if not all_scores:
-            return 0.0
+        # 1. Get average scores from top matches
+        # Normalize scores to 0-1 for weighted averaging
+        top_k = 5 # Using top 5 matches to influence the overall score
+        
+        lex_scores = [r['similarity_score'] / 100.0 for r in lexical_results[:top_k]]
+        sem_scores = [r['similarity_score'] / 100.0 for r in semantic_results[:top_k]]
+        
+        # Calculate mean scores (0-1)
+        mean_lex = np.mean(lex_scores) if lex_scores else 0.0
+        mean_sem = np.mean(sem_scores) if sem_scores else 0.0
+        
+        # 2. Calculate the combined score (0-1)
+        combined_score_norm = (mean_lex * W_LEX) + (mean_sem * W_SEM)
+        
+        # Convert to percentage
+        overall_score = round(float(combined_score_norm * 100), 2)
+        
+        # Breakdown is often just the contribution to the overall score
+        lexical_breakdown = round(float(mean_lex * W_LEX * 100), 2)
+        semantic_breakdown = round(float(mean_sem * W_SEM * 100), 2)
 
-        # Weighted average or simple mean
-        mean_score = np.mean(all_scores)
-        
-        # Convert back to percentage (0-100)
-        return round(float(mean_score * 100), 2)
+        return overall_score, lexical_breakdown, semantic_breakdown
