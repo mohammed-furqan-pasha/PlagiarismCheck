@@ -27,9 +27,6 @@ def get_checker():
     """Returns the globally initialized PlagiarismService instance."""
     return PLAGIARISM_CHECKER
 
-# Assign the global instance dependency function to the router's placeholder
-plagiarism_router.dependencies = [FastAPI.Depends(get_checker)] 
-
 
 # --- Application Setup ---
 app = FastAPI(
@@ -38,19 +35,26 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Wire the router's placeholder dependency (`get_plagiarism_service`) to the global singleton.
+# Any `Depends(get_plagiarism_service)` in the router will now receive `get_checker()`.
+app.dependency_overrides[get_plagiarism_service] = get_checker
+
 # --- CORS Configuration ---
+# Wide-open for development so frontend on any local port (e.g. Vite 5173) can talk to the API.
 origins = [
     "http://localhost",
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://localhost:5173",  # Vite dev server
+    "http://127.0.0.1",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # For development, allow all origins so preflight OPTIONS from any localhost port works.
+    allow_origins=["*"],  # alternatively: allow_origins=origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # allow GET, POST, OPTIONS, etc.
+    allow_headers=["*"],  # allow all standard/custom headers
 )
 
 # --- Router Inclusion ---

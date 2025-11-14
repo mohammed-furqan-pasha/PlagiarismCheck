@@ -15,43 +15,59 @@ import { Zap, Brain } from 'lucide-react';
 const MatchSnippet = ({ match }) => {
     // Determine visual style based on match type
     const isLexical = match.match_type === 'lexical';
-    const bgColorClass = isLexical ? 'bg-match-lexical' : 'bg-match-semantic';
-    const borderColorClass = isLexical ? 'border-red-400' : 'border-blue-400';
-    const icon = isLexical ? <Zap className="w-4 h-4 mr-1 text-red-600" /> : <Brain className="w-4 h-4 mr-1 text-blue-600" />;
+    const bgTintClass = isLexical
+        ? 'bg-match-lexical bg-red-50/80'
+        : 'bg-match-semantic bg-sky-50/80';
+    const borderColorClass = isLexical ? 'border-red-500' : 'border-sky-500';
+    const labelColorClass = isLexical ? 'text-red-700' : 'text-sky-700';
+    const icon = isLexical ? (
+        <Zap className="w-4 h-4 mr-1" />
+    ) : (
+        <Brain className="w-4 h-4 mr-1" />
+    );
 
     return (
-        <motion.div
+        <motion.article
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className={`p-4 rounded-xl shadow-sm transition-shadow ${bgColorClass} border-l-4 ${borderColorClass}`}
+            transition={{ duration: 0.25 }}
+            className={`rounded-2xl bg-white shadow-md border border-slate-100 border-l-4 ${borderColorClass} overflow-hidden`}
         >
             {/* Match Type and Score */}
-            <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-200">
-                <p className="text-sm font-semibold uppercase text-gray-700 flex items-center">
+            <div className={`flex justify-between items-center px-4 py-2 border-b border-slate-100 ${bgTintClass}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide flex items-center ${labelColorClass}`}>
                     {icon}
-                    {isLexical ? 'Lexical Match (Direct)' : 'Semantic Match (Meaning)'}
+                    {isLexical ? 'Lexical match (direct overlap)' : 'Semantic match (similar meaning)'}
                 </p>
-                <p className="text-lg font-bold">
+                <p className="text-sm font-semibold text-slate-800">
                     {match.similarity_score.toFixed(1)}%
                 </p>
             </div>
 
-            {/* Query Text */}
-            <h4 className="text-base font-medium text-gray-800 mb-2">Your Text:</h4>
-            <blockquote className="text-gray-900 border-l-4 border-gray-300 pl-3 italic">
-                {match.query_text}
-            </blockquote>
+            <div className="px-4 py-3 space-y-3">
+                {/* Query Text */}
+                <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                        Your sentence
+                    </h4>
+                    <blockquote className="text-sm text-slate-900 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                        {match.query_text}
+                    </blockquote>
+                </div>
 
-            {/* Source Preview */}
-            <h4 className="text-base font-medium text-gray-800 mt-4 mb-2">Matched Source Preview:</h4>
-            <div className="text-sm text-gray-600 bg-white p-3 rounded">
-                {/* Truncate the source text for the preview */}
-                {match.matched_text.length > 150 
-                    ? match.matched_text.substring(0, 150) + '...'
-                    : match.matched_text}
+                {/* Source Preview */}
+                <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                        Matched source preview
+                    </h4>
+                    <div className="text-xs sm:text-sm text-slate-50 bg-slate-900 rounded-lg px-3 py-2 border border-slate-700">
+                        {match.matched_text.length > 180
+                            ? `${match.matched_text.substring(0, 180)}...`
+                            : match.matched_text}
+                    </div>
+                </div>
             </div>
-        </motion.div>
+        </motion.article>
     );
 };
 

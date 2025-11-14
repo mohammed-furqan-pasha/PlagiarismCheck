@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, FileText, Clipboard, XCircle } from 'lucide-react';
+import { Send, Clipboard, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 // --- Import Extracted Components ---
@@ -42,9 +42,8 @@ function App() {
                 lexical_breakdown: data.lexical_breakdown,
                 semantic_breakdown: data.semantic_breakdown,
                 processing_time_s: data.processing_time_s,
-                matches: data.matches || [] // Use the real matches array
+                matches: data.matches || [], // Use the real matches array
             });
-
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -52,7 +51,16 @@ function App() {
             setIsLoading(false);
         }
     };
-    
+
+    // Auto-resizing textarea handler (up to ~6 lines)
+    const handleInputChange = (e) => {
+        const textarea = e.target;
+        textarea.style.height = 'auto';
+        const maxHeight = 160; // ~5-6 lines depending on font-size
+        textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+        setInputText(textarea.value);
+    };
+
     // Function to clear input and results
     const handleClear = () => {
         setInputText('');
@@ -61,125 +69,142 @@ function App() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-white">
+        <div className="min-h-screen flex flex-col bg-slate-50">
             {/* Top Bar (Green Academic Theme) */}
-            <header className="w-full bg-academic-green text-white p-4 shadow-lg flex justify-center sticky top-0 z-10">
+            <header className="w-full bg-academic-green text-white px-4 py-3 shadow-md flex justify-center sticky top-0 z-20">
                 <div className="max-w-4xl w-full flex items-center">
-                    <h1 className="text-xl font-bold tracking-wider">
-                        CopyLess <span className="font-normal text-sm opacity-80">[Prototype]</span>
+                    <h1 className="text-xl font-semibold tracking-wide">
+                        CopyLess
                     </h1>
                 </div>
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-grow flex justify-center p-8 pt-6">
-                <div className="w-full max-w-4xl">
-                    
+            {/* Main content is centered with constrained width for readability */}
+            <main className="flex-1 flex justify-center px-4 pt-6 pb-40">
+                <div className="w-full max-w-4xl flex flex-col gap-6">
                     {/* Results / Dashboard Area */}
-                    <div className="min-h-60 mb-8">
+                    <div className="min-h-[220px]">
                         {error && (
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-red-50 border border-red-300 text-red-700 p-4 rounded-lg mb-4 flex items-center"
+                                className="bg-red-50 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-start shadow-sm"
                             >
-                                <XCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+                                <XCircle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-semibold">Error:</p>
-                                    <p className="text-sm">{error}</p>
+                                    <p className="font-semibold">Error</p>
+                                    <p className="text-sm leading-relaxed">{error}</p>
                                 </div>
                             </motion.div>
                         )}
 
                         {isLoading && (
-                            <div className="text-center p-12 text-gray-500 flex flex-col items-center">
-                                <motion.div 
-                                    animate={{ rotate: 360 }} 
-                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            <div className="text-center py-12 text-gray-500 flex flex-col items-center">
+                                <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                     className="w-6 h-6 border-2 border-academic-green border-t-transparent rounded-full mb-3"
                                 />
-                                <p>Analyzing text (Lexical & Semantic Checks)...</p>
+                                <p className="text-sm">Analyzing text (Lexical &amp; Semantic Checks)...</p>
                             </div>
                         )}
 
                         {results && (
-                            <motion.div 
-                                initial={{ opacity: 0 }} 
-                                animate={{ opacity: 1 }} 
-                                className="w-full"
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="w-full space-y-6"
                             >
-                                <ScoreDisplay 
+                                <ScoreDisplay
                                     score={results.overall_similarity}
                                     lexical={results.lexical_breakdown}
                                     semantic={results.semantic_breakdown}
                                 />
-                                
-                                <h2 className="text-2xl font-semibold mt-8 mb-4 text-gray-800 flex justify-between items-center">
-                                    Matched Snippets ({results.matches.length})
-                                </h2>
-                                
-                                <div className="space-y-4">
-                                    {/* --- KEY UPDATE: Mapping over the real matches array --- */}
-                                    {results.matches.length > 0 ? (
-                                        results.matches.map((match, index) => (
-                                            <MatchSnippet key={index} match={match} />
-                                        ))
-                                    ) : (
-                                        <div className="p-4 bg-green-50 text-academic-green rounded-lg border border-green-200">
-                                            🎉 **Zero Plagiarism Detected!** Your text is highly original against the current corpus.
-                                        </div>
-                                    )}
-                                    
-                                    {/* Display processing time */}
-                                    <p className="text-xs text-gray-400 pt-4">
-                                        Processing Time: {results.processing_time_s} seconds.
-                                    </p>
-                                </div>
+
+                                <section>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h2 className="text-lg font-semibold text-gray-900">
+                                            Matched Snippets
+                                        </h2>
+                                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+                                            {results.matches.length} matches
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {results.matches.length > 0 ? (
+                                            results.matches.map((match, index) => (
+                                                <MatchSnippet key={index} match={match} />
+                                            ))
+                                        ) : (
+                                            <div className="p-4 rounded-xl bg-emerald-50 text-emerald-800 shadow-sm">
+                                                <p className="text-sm font-semibold mb-1">
+                                                    Zero Plagiarism Detected
+                                                </p>
+                                                <p className="text-xs">
+                                                    Your text appears highly original against the current corpus.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Processing time */}
+                                        <p className="text-xs text-gray-400 pt-2">
+                                            Processing time: {results.processing_time_s} seconds.
+                                        </p>
+                                    </div>
+                                </section>
                             </motion.div>
                         )}
 
                         {!isLoading && !results && !error && (
-                             <div className="text-center p-12 text-gray-400">
-                                <Clipboard className="w-10 h-10 mx-auto mb-3" />
-                                <p>Paste your text below to check for plagiarism.</p>
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                                <Clipboard className="w-10 h-10 mb-3" />
+                                <p className="text-sm">Paste your text below to check for plagiarism.</p>
                             </div>
                         )}
                     </div>
+                </div>
+            </main>
 
-
-                    {/* Chat-style Input Box */}
-                    <form onSubmit={handleSubmit} className="w-full sticky bottom-0 bg-white p-4 rounded-xl shadow-2xl border border-gray-100">
-                        <div className="flex items-end">
+            {/* Docked chat-style input bar */}
+            {/* Docked chat-style input bar (fixed, floating card) */}
+            <div className="w-full fixed inset-x-0 bottom-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 shadow-2xl">
+                <div className="max-w-4xl mx-auto px-4 py-3">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="w-full rounded-2xl bg-input-bg shadow-xl px-3 py-2"
+                    >
+                        <div className="flex items-end gap-3">
                             <textarea
                                 value={inputText}
-                                onChange={(e) => setInputText(e.target.value)}
-                                rows={3} // Start with a few rows visible
+                                onChange={handleInputChange}
+                                rows={1}
                                 placeholder="Paste your assignment or report here..."
-                                className="flex-grow resize-none p-3 text-lg bg-input-bg rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-academic-green transition-all"
+                                className="flex-grow max-h-40 min-h-[44px] resize-none p-3 text-sm md:text-base bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-academic-green focus:border-transparent transition-all overflow-y-auto"
                                 disabled={isLoading}
                             />
                             <button
                                 type="submit"
                                 disabled={isLoading || !inputText.trim()}
-                                className="ml-3 p-3 bg-academic-green text-white rounded-lg hover:bg-academic-green/80 transition-colors disabled:bg-gray-400"
+                                className="flex items-center justify-center px-5 py-3 rounded-xl bg-academic-green text-white text-sm font-semibold shadow-md hover:bg-academic-green/90 disabled:bg-gray-400 disabled:shadow-none transition-colors"
                                 title="Check Plagiarism"
                             >
-                                <Send className="w-6 h-6" />
+                                <Send className="w-5 h-5" />
                             </button>
                             <button
                                 type="button"
                                 onClick={handleClear}
                                 disabled={isLoading || (!inputText && !results && !error)}
-                                className="ml-2 p-3 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+                                className="flex items-center justify-center px-3 py-3 rounded-xl bg-red-100 text-red-700 text-xs font-medium hover:bg-red-200 disabled:opacity-50 transition-colors"
                                 title="Clear Input & Results"
                             >
-                                <XCircle className="w-6 h-6" />
+                                <Trash2 className="w-4 h-4" />
                             </button>
                         </div>
                     </form>
-
                 </div>
-            </main>
+            </div>
         </div>
     );
 }

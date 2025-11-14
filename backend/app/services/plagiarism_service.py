@@ -36,9 +36,10 @@ class PlagiarismService:
 
         # 4. Lexical Index (MinHash/LSH)
         # --- USAGE UPDATE 2 & 3: Use settings.LSH_THRESHOLD and settings.LSH_PERMUTATIONS ---
+        # NOTE: datasketch.MinHashLSH uses the `num_perm` keyword (not `num_permutations`).
         self.lsh_index = MinHashLSH(
-            threshold=settings.LSH_THRESHOLD, 
-            num_permutations=settings.LSH_PERMUTATIONS
+            threshold=settings.LSH_THRESHOLD,
+            num_perm=settings.LSH_PERMUTATIONS,
         )
         self.corpus_minhashes = self._build_lsh_index(self.corpus_documents)
 
@@ -75,7 +76,8 @@ class PlagiarismService:
         num_perms = settings.LSH_PERMUTATIONS
         
         for i, doc in enumerate(documents):
-            m = MinHash(num_permutations=num_perms)
+            # NOTE: datasketch.MinHash uses the `num_perm` keyword (not `num_permutations`).
+            m = MinHash(num_perm=num_perms)
             for d in doc.lower().split():
                 m.update(d.encode('utf8'))
             key = f"doc_{i}"
@@ -171,12 +173,28 @@ class PlagiarismService:
         num_perms = settings.LSH_PERMUTATIONS
         
         for query_sentence in input_sentences:
-            m_query = MinHash(num_permutations=num_perms)
+            # First, check for direct inclusion of the query sentence in any corpus
+            # paragraph. This strongly rewards verbatim plagiarism (identical or
+            # nearly-identical sentences/paragraphs), without requiring the entire
+            # paragraph text to match.
+            normalized_query = query_sentence.strip()
+            for doc_index, doc in enumerate(self.corpus_documents):
+                if normalized_query and normalized_query in doc:
+                    results.append({
+                        "query_text": query_sentence,
+                        "matched_text": doc,
+                        "similarity_score": 100.0,
+                        "match_type": "lexical",
+                        "source_id": f"corpus_doc_{doc_index}",
+                    })
+
+            # NOTE: datasketch.MinHash uses the `num_perm` keyword (not `num_permutations`).
+            m_query = MinHash(num_perm=num_perms)
             for d in query_sentence.lower().split():
-                m_query.update(d.encode('utf8'))
-            
+                m_query.update(d.encode("utf8"))
+
             candidates = self.lsh_index.query(m_query)
-            
+
             for doc_key in candidates:
                 m_candidate = self.corpus_minhashes[doc_key]
                 jaccard_similarity = m_query.jaccard(m_candidate)
@@ -205,25 +223,36 @@ class PlagiarismService:
         W_LEX = settings.WEIGHT_LEXICAL
         W_SEM = settings.WEIGHT_SEMANTIC
         
-        # 1. Get average scores from top matches
-        # Normalize scores to 0-1 for weighted averaging
-        top_k = 5 # Using top 5 matches to influence the overall score
-        
-        lex_scores = [r['similarity_score'] / 100.0 for r in lexical_results[:top_k]]
-        sem_scores = [r['similarity_score'] / 100.0 for r in semantic_results[:top_k]]
-        
-        # Calculate mean scores (0-1)
-        mean_lex = np.mean(lex_scores) if lex_scores else 0.0
-        mean_sem = np.mean(sem_scores) if sem_scores else 0.0
-        
-        # 2. Calculate the combined score (0-1)
-        combined_score_norm = (mean_lex * W_LEX) + (mean_sem * W_SEM)
-        
+        # 1. Get scores from top matches
+        # Normalize scores to 0-1.
+        top_k = 5  # Look at up to the top 5 matches in each channel.
+
+        lex_scores = [r["similarity_score"] / 100.0 for r in lexical_results[:top_k]]
+        sem_scores = [r["similarity_score"] / 100.0 for r in semantic_results[:top_k]]
+
+        # Use max similarity (0-1) from each channel if available.
+        lex_score = max(lex_scores) if lex_scores else 0.0
+        sem_score = max(sem_scores) if sem_scores else 0.0
+
+        # 2. Calculate the combined score:
+        # Use the stronger of the two channels as the base overall similarity
+        # signal, then aggressively downscale weak similarities so that
+        # incidental matches stay near 0 while strong matches remain high.
+        raw_score = max(lex_score, sem_score)
+        if raw_score < 0.5:
+            # Anything below 0.5 similarity is treated as weak and heavily
+            # compressed towards zero.
+            combined_score_norm = raw_score * 0.2
+        else:
+            # Preserve strong similarities so direct/near-direct plagiarism
+            # remains clearly distinguishable.
+            combined_score_norm = raw_score
+
         # Convert to percentage
         overall_score = round(float(combined_score_norm * 100), 2)
-        
-        # Breakdown is often just the contribution to the overall score
-        lexical_breakdown = round(float(mean_lex * W_LEX * 100), 2)
-        semantic_breakdown = round(float(mean_sem * W_SEM * 100), 2)
+
+        # Breakdown shows each channel's weighted contribution (for UI only)
+        lexical_breakdown = round(float(lex_score * W_LEX * 100), 2)
+        semantic_breakdown = round(float(sem_score * W_SEM * 100), 2)
 
         return overall_score, lexical_breakdown, semantic_breakdown
