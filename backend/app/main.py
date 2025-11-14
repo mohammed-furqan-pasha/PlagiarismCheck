@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from .models.plagiarism import PlagiarismRequest, PlagiarismResponse
 import uvicorn
 import os
 import time
