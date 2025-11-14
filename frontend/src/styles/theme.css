@@ -1,0 +1,13 @@
+/* Custom CSS rules go here. 
+ * Since we are using Tailwind, this file might remain empty 
+ * or only contain custom utility classes not defined in the config. 
+ */
+
+/* Example: Add a custom scrollbar style */
+/* ::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-thumb {
+    background: #007A5E;
+    border-radius: 4px;
+} */
