@@ -51,10 +51,12 @@ async def check_plagiarism_endpoint(
         )
 
     # Basic input validation
-    if not request.text_to_check or len(request.text_to_check.strip()) < 10:
+    # Previously this required at least 10 characters, which rejected short queries.
+    # For a better UX we now accept any non-empty text and let the scoring logic handle it.
+    if not request.text_to_check or not request.text_to_check.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please provide a substantial amount of text (at least 10 characters) to check."
+            detail="Please provide some text to check (input cannot be empty)."
         )
 
     # Execute core logic

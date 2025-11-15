@@ -5,6 +5,7 @@ from pathlib import Path
 # --- Core Service & Router Imports ---
 from .services.plagiarism_service import PlagiarismService
 from .api.plagiarism import router as plagiarism_router, get_plagiarism_service
+from .api.web_compare import router as web_compare_router
 
 # --- Core Initialization (The Singleton) ---
 # NOTE: This section runs once when the module is imported (Uvicorn starts)
@@ -60,6 +61,8 @@ app.add_middleware(
 # --- Router Inclusion ---
 # All plagiarism check endpoints (e.g., /api/v1/check) are now defined in plagiarism_router.
 app.include_router(plagiarism_router, prefix="/api")
+# Live web comparison endpoints (e.g., /api/web/compare)
+app.include_router(web_compare_router, prefix="/api")
 
 # --- Health Check Endpoint (Kept in main.py) ---
 @app.get("/", tags=["Health Check"])

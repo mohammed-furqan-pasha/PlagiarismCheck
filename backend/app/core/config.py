@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import ClassVar
 
 class Settings(BaseSettings):
+    # Load environment variables from the project-level .env file
+    model_config: ClassVar = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     """
     Configuration settings for the CopyLess backend and AI models.
     We use Pydantic BaseSettings for easy environment variable loading
@@ -30,6 +32,12 @@ class Settings(BaseSettings):
     # Weights for calculating the final overall score (must sum to 1.0)
     WEIGHT_LEXICAL: float = 0.6
     WEIGHT_SEMANTIC: float = 0.4
+    
+    # --- Web Search Configuration ---
+    # Serper.dev API key and search limits for live web plagiarism checks
+    SERPER_API_KEY: str | None = None
+    MAX_SEARCH_RESULTS: int = 5
+    MAX_CHUNKS_PER_PAGE: int = 10
     
     # --- CORS Configuration (Optional) ---
     # Frontend URL (default React port)

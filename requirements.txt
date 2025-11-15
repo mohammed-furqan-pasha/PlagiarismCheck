@@ -14,6 +14,14 @@ datasketch
 # Tokenization and standard NLP utilities
 nltk
 
+# --- Web search / scraping / utilities ---
+requests
+beautifulsoup4
+trafilatura
+cachetools
+scikit-learn
+python-dotenv
+
 # Database/Storage (Assuming a simple setup for the corpus)
 # Though you mentioned Supabase, we'll keep the core package light. 
 # We might add 'supabase-py' later if needed for the ORM, but 

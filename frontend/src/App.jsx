@@ -1,10 +1,44 @@
 import React, { useState } from 'react';
-import { Send, Clipboard, Trash2 } from 'lucide-react';
+import { Send, Clipboard, Trash2, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 // --- Import Extracted Components ---
 import ScoreDisplay from './components/ScoreDisplay';
 import MatchSnippet from './components/MatchSnippet';
+
+// --- Helper: normalize web comparison results into local-style shape ---
+const normalizeWebResults = (inputText, webMatches) => {
+    if (!Array.isArray(webMatches) || webMatches.length === 0) {
+        return {
+            overall_similarity: 0,
+            lexical_breakdown: 0,
+            semantic_breakdown: 0,
+            processing_time_s: 0,
+            matches: [],
+        };
+    }
+
+    const maxScore = Math.max(...webMatches.map((m) => m.score ?? 0));
+    const overallPct = Number((maxScore * 100).toFixed(2));
+
+    const matches = webMatches.map((m) => ({
+        query_text: inputText,
+        matched_text: m.snippet || '',
+        // web scores come back 0.0–1.0; convert to percent for UI
+        similarity_score: (m.score ?? 0) * 100,
+        match_type: 'web_semantic',
+        url: m.url,
+        title: m.title,
+    }));
+
+    return {
+        overall_similarity: overallPct,
+        lexical_breakdown: 0,
+        semantic_breakdown: overallPct, // semantic-only signal
+        processing_time_s: 0,
+        matches,
+    };
+};
 
 // --- Main Application Component ---
 
@@ -13,6 +47,8 @@ function App() {
     const [results, setResults] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [mode, setMode] = useState('local_corpus'); // 'local_corpus' | 'web_comparison'
+    const isWebMode = mode === 'web_comparison';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -23,10 +59,18 @@ function App() {
         setResults(null);
 
         try {
-            const response = await fetch('http://localhost:8000/api/v1/check', {
+            const endpoint = isWebMode
+                ? 'http://localhost:8000/api/web/compare'
+                : 'http://localhost:8000/api/v1/check';
+
+            const payload = isWebMode
+                ? { text: inputText, top_k: 5 }
+                : { text_to_check: inputText };
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text_to_check: inputText }),
+                body: JSON.stringify(payload),
             });
 
             const data = await response.json();
@@ -36,14 +80,19 @@ function App() {
                 throw new Error(data.detail || 'Failed to connect to the backend API.');
             }
 
-            // --- KEY UPDATE: Store the full structured response ---
-            setResults({
-                overall_similarity: data.overall_similarity,
-                lexical_breakdown: data.lexical_breakdown,
-                semantic_breakdown: data.semantic_breakdown,
-                processing_time_s: data.processing_time_s,
-                matches: data.matches || [], // Use the real matches array
-            });
+            if (isWebMode) {
+                const normalized = normalizeWebResults(inputText, data);
+                setResults(normalized);
+            } else {
+                // Local corpus check: keep structured response from API
+                setResults({
+                    overall_similarity: data.overall_similarity,
+                    lexical_breakdown: data.lexical_breakdown,
+                    semantic_breakdown: data.semantic_breakdown,
+                    processing_time_s: data.processing_time_s,
+                    matches: data.matches || [], // Use the real matches array
+                });
+            }
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -175,6 +224,35 @@ function App() {
                         onSubmit={handleSubmit}
                         className="w-full rounded-2xl bg-input-bg shadow-xl px-3 py-2"
                     >
+                        {/* Mode toggle: Local corpus vs Web comparison */}
+                        <div className="flex items-center justify-between mb-2 px-1">
+                            <span className="text-[11px] text-slate-500">Mode</span>
+                            <div className="inline-flex rounded-full bg-slate-100 p-1 text-[11px] font-medium">
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('local_corpus')}
+                                    className={`px-3 py-1 rounded-full transition-colors ${
+                                        mode === 'local_corpus'
+                                            ? 'bg-white text-slate-900 shadow-sm'
+                                            : 'text-slate-500'
+                                    }`}
+                                >
+                                    Local corpus
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('web_comparison')}
+                                    className={`px-3 py-1 rounded-full transition-colors ${
+                                        mode === 'web_comparison'
+                                            ? 'bg-white text-slate-900 shadow-sm'
+                                            : 'text-slate-500'
+                                    }`}
+                                >
+                                    Web comparison
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="flex items-end gap-3">
                             <textarea
                                 value={inputText}
