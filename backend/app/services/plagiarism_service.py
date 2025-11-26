@@ -24,11 +24,11 @@ class PlagiarismService:
         # 1. Load Corpus
         self.corpus_path = corpus_path
         self.corpus_documents = self._load_corpus(corpus_path)
-
+        tiny_model_name = "all-MiniLM-L6-v2"
         # 2. Semantic Model (SBERT)
         # --- USAGE UPDATE 1: Use settings.SBERT_MODEL_NAME ---
-        print(f"Loading SBERT model: {settings.SBERT_MODEL_NAME}...")
-        self.sbert_model = SentenceTransformer(settings.SBERT_MODEL_NAME)
+        print(f"Loading SBERT model: {tiny_model_name}...")
+        self.sbert_model = SentenceTransformer(tiny_model_name)
         self.corpus_embeddings = self._generate_embeddings(self.corpus_documents)
 
         # 3. Semantic Index (FAISS)

@@ -1,31 +1,33 @@
-# Core Backend Framework
+# --- Critical: Force CPU-only PyTorch (Save ~700MB) ---
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchaudio
+
+# --- Core Backend Framework ---
 fastapi
 uvicorn[standard]
 pydantic
-python-dotenv
 pydantic-settings
-# AI / NLP / Plagiarism Detection Libraries
-# Sentence-Transformers for Semantic Matching (SBERT)
+python-dotenv
+
+# --- AI & NLP (Optimized for CPU) ---
+# SBERT for semantic matching
 sentence-transformers
-# FAISS for efficient similarity search (Semantic Search Index)
+# FAISS CPU version (Do NOT use 'faiss' or 'faiss-gpu')
 faiss-cpu
-# Datasketch for MinHash and Locality Sensitive Hashing (LSH)
+# LSH for near-duplicate detection
 datasketch
-# Tokenization and standard NLP utilities
+# Standard NLP
 nltk
 
-# --- Web search / scraping / utilities ---
+# --- Web Scraping & Utilities ---
 requests
 beautifulsoup4
 trafilatura
 cachetools
+# Scikit-learn (Used for TF-IDF or vector utilities)
 scikit-learn
-python-dotenv
 
-# Database/Storage (Assuming a simple setup for the corpus)
-# Though you mentioned Supabase, we'll keep the core package light. 
-# We might add 'supabase-py' later if needed for the ORM, but 
-# for a prototype, we'll focus on the core detection first.
-
-# Optional (for development/debugging)
-ipython
+# --- Optional/Dev ---
+# ipython  <-- REMOVED: Do not deploy this to production (wastes space/memory)
