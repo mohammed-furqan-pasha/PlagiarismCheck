@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 // --- Import Extracted Components ---
 import ScoreDisplay from './components/ScoreDisplay';
 import MatchSnippet from './components/MatchSnippet';
+// Put this at the top of your file
+const BASE_URL = "https://plagiarismcheck-weoc.onrender.com"; 
 
 // --- Helper: normalize web comparison results into local-style shape ---
 const normalizeWebResults = (inputText, webMatches) => {
@@ -60,8 +62,8 @@ function App() {
 
         try {
             const endpoint = isWebMode
-                ? 'http://localhost:8000/api/web/compare'
-                : 'http://localhost:8000/api/v1/check';
+                ? `${BASE_URL}/api/web/compare`
+                : `${BASE_URL}/api/v1/check`;
 
             const payload = isWebMode
                 ? { text: inputText, top_k: 5 }
